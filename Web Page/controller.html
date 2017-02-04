@@ -157,6 +157,36 @@
 </header>
  <!-- End data from nav template -->
 <main>
+	<!-- Bridge connection modal -->
+	<div id="connectModal" class="modal">
+		<div class="modal-content center-align">
+			<h3>Connect to your HUE Bridge</h3>
+			<div class="divider"></div>
+			<br />
+			<h4 id="modal-ip-display" class="green-text bold"></h4>
+			<h5 id="modal-info-display">Attempting to connect to stored bridge<br/><br />
+				<div class="preloader-wrapper big active">
+						<div class="spinner-layer spinner-blue-only">
+							<div class="circle-clipper left">
+								<div class="circle"></div>
+							</div>
+							<div class="gap-patch">
+								<div class="circle"></div>
+							</div>
+							<div class="circle-clipper right">
+								<div class="circle"></div>
+							</div>
+						</div>
+					</div>
+			</h5>
+			<h4 id="connect-timer" class="hide green-text"></h4>
+			<br />
+			<div id="find-bridge-button" class="btn btn-large hide blue" onclick="connectToNewBridge()">Find Bridge</div>
+			<div id="close-bridge-button" class="btn btn-large hide red" onclick="$('#connectModal').modal('close')">Close</div>
+		</div>
+	</div>
+
+
 	<!-- Page Title Header -->
 	<div class="container white darken-3 z-depth-1">
 		
@@ -382,6 +412,9 @@
 			$('.collapsible').collapsible();
   		});
 	</script>
+
+	<!-- EzHueAPI -->
+	<script src="js/EzHue.js"></script>
 
 	<!-- Controller Form -->
 	<script src="js/controller.js"></script>

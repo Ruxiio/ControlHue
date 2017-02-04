@@ -1,5 +1,94 @@
 var currentColorType;
 var bridgeNameInputLoaded = false;
+var hueapi = new EzHue();
+
+
+$(document).ready(function(){
+
+	//Dependent for matCSS modals
+    $('.modal').modal();
+
+    $('#connectModal').modal({
+		dismissible:false,
+		opacity:0.7
+	});
+
+	$('#connectModal').modal('open');
+
+	connectToExistingBridge();
+
+});
+
+function connectToExistingBridge(){
+
+	hueapi.findExistingBridge(function(success, msg){
+		if(success){
+			document.getElementById('bridge-name').innerHTML = hueapi.bridge.name;
+			document.getElementById('bridge-ip').innerHTML = hueapi.bridge.ip;
+			document.getElementById('modal-info-display').innerHTML = "Connection was successful!";
+			showElementWithId('close-bridge-button');
+		}
+		else{
+			console.log(msg);
+			setupNewBridge();
+		}
+	});
+
+	function setupNewBridge(){
+		document.getElementById('modal-info-display').innerHTML = "Could not find a previously stored bridge!<br />Please click the button below to set-up a new bridge.";
+		showElementWithId('find-bridge-button');
+	}
+}
+
+function connectToNewBridge(){
+	var info = document.getElementById('modal-info-display');
+	var timerDisplay = 15;
+	var findBtn;
+	var connectTimer;
+	hueapi.createBridge(function(ip){
+		findBtn = hideElementWithId('find-bridge-button');
+		document.getElementById('modal-ip-display').innerHTML = "Bridge found at : " + ip;
+		info.innerHTML = "Now press the link button on your HUE bridge within 15 seconds!";
+		connectTimer = showElementWithId("connect-timer");
+		connectTimer.innerHTML = timerDisplay;
+		var timer = setInterval(function(){
+			if(timerDisplay != 0){
+				timerDisplay--;
+
+				if(timerDisplay < 10 && timerDisplay > 5){
+					connectTimer.classList.remove("green-text");
+					connectTimer.classList.add("yellow-text");
+				}
+				else if(timerDisplay < 5){
+					connectTimer.classList.remove("yellow-text");
+					connectTimer.classList.add("red-text");
+				}
+
+				connectTimer.innerHTML = timerDisplay;
+			}
+			else{
+				clearInterval(timer);
+			}
+		}, 1000);
+	}, function(success, msg){
+		if(success){
+			connectTimer.innerHTML = "";
+			document.getElementById('bridge-name').innerHTML = hueapi.bridge.name;
+			document.getElementById('bridge-ip').innerHTML = hueapi.bridge.ip;
+			document.getElementById('modal-info-display').innerHTML = "Connection was successful!";
+			showElementWithId('close-bridge-button');
+		}
+		else{
+			connectTimer.innerHTML = "";
+			connectTimer.classList.remove("red-text");
+			connectTimer.classList.add("green-text");
+			info.innerHTML = "The button on the bridge was not pressed in time.<br />Please try again.";
+			findBtn.innerHTML = "Try again";
+			showElementWithId('find-bridge-button');
+		}
+
+	});
+}
 
 //Color Type Handler
 function updateColorType(type) {
@@ -71,62 +160,60 @@ function renameBridge(button){
 		apply.appendChild(applyIcon);
 		cancel.appendChild(cancelIcon);
 	}
-
 }
 
+//Complete
 function submitBridgeName(){
-
+	console.log("submitting new name");
 	var newName = document.getElementById("new-bridge-name").value;
 
-	//Add XML functionality later
-
-	//Later add if HTTP Request completed
-	var nameDisplay = document.getElementById("bridge-name");
-	nameDisplay.innerHTML = newName;
-
-	hideBridgeNameInput();
+	hueapi.bridge.rename(newName, function(success, msg){
+		if(success){
+			document.getElementById("bridge-name").innerHTML = newName;
+			//Hides bridge rename when process is completed
+			hideBridgeNameInput();
+		}
+		else{
+			console.log(msg);
+		}
+	});
 }
-
+//Complete
 function hideBridgeNameInput(){
+	//Shows that the input data has been loaded into the html
 	if(!bridgeNameInputLoaded){
 		bridgeNameInputLoaded = true;
 	}
-
-	var inputField = document.getElementById("rename-bridge-input");
-	inputField.classList.add("hide");
-
-	var inputBox = document.getElementById("new-bridge-name");
-	inputBox.value = "";
-
-	var renameButton = document.getElementById("rename-bridge-button");
-	renameButton.classList.remove("hide");
+	//Hide input field
+	hideElementWithId("rename-bridge-input");
+	//Reset input box value
+	document.getElementById("new-bridge-name").value = "";
+	//Show rename bridge button
+	showElementWithId("rename-bridge-button");
 }
-
+//Complete
 function displayBridgeNameInput(){
+	//Hide rename bridge button
+	hideElementWithId("rename-bridge-button");
 
-	var renameButton = document.getElementById("rename-bridge-button");
-	renameButton.classList.add("hide");
-
-	var inputField = document.getElementById("rename-bridge-input");
-	inputField.classList.remove("hide");
-
+	//Show bridge rename input field
+	showElementWithId("rename-bridge-input");
 }
 
-$(document).ready(function(){
+//Init Color sliders//
+//Hue Slider
+var hueSlider = document.getElementById("hue-slider");
+var hueValueOutput = document.getElementById("hue-value");
 
-	//Hue Slider
-	var hueSlider = document.getElementById("hue-slider");
-	var hueValueOutput = document.getElementById("hue-value");
-
-	noUiSlider.create(hueSlider, {
-		start: 127,
-		step: 1,
-		connect: [true, true],
-		range: {
-			'min' : [0],
-			'50%' : [127],
-			'max' : [255]
-		},
+noUiSlider.create(hueSlider, {
+	start: 127,
+	step: 1,
+	connect: [true, true],
+	range: {
+		'min' : [0],
+		'50%' : [127],
+		'max' : [255]
+	},
 	pips: { // Show a scale with the slider
 		mode: 'range',
 		density: 5
@@ -134,179 +221,174 @@ $(document).ready(function(){
 	format: wNumb({
 		decimals: 0
 	})
-	});
+});
 
-	hueSlider.noUiSlider.on('update', function(values, handle){
-		hueValueOutput.innerHTML = values[handle];
-	});
-	
-	//Brightness Slider//
-	var briSlider = document.getElementById("bri-slider");
-	var briValueOutput = document.getElementById("bri-value");
-	
-	noUiSlider.create(briSlider, {
-		start: 50,
-		step: 1,
-		connect: [true, true],
-		range: {
-			'min' : [0],
-			'50%' : [50],
-			'max' : [100]
-		},
-		pips : {
-			mode: 'range',
-			density: 5
-		},
-		format: wNumb({
-			decimals: 0
-		})
-	});
+hueSlider.noUiSlider.on('update', function(values, handle){
+	hueValueOutput.innerHTML = values[handle];
+});
 
-	briSlider.noUiSlider.on('update', function(values, handle){
-		briValueOutput.innerHTML = values[handle];
-	});
-	
-	//Saturation Slider
-	var satSlider = document.getElementById("sat-slider");
-	var satValueOutput = document.getElementById("sat-value");
+//Brightness Slider//
+var briSlider = document.getElementById("bri-slider");
+var briValueOutput = document.getElementById("bri-value");
 
-	noUiSlider.create(satSlider, {
-		start: 50,
-		step: 1,
-		connect: [true, true],
-		range: {
-			'min' : [0],
-			'50%' : [50],
-			'max' : [100]
-		},
-		pips: {
-			mode: 'range',
-			density: 5
-		},
-		format: wNumb({
-			decimals: 0
-		})
-	});
+noUiSlider.create(briSlider, {
+	start: 50,
+	step: 1,
+	connect: [true, true],
+	range: {
+		'min' : [0],
+		'50%' : [50],
+		'max' : [100]
+	},
+	pips : {
+		mode: 'range',
+		density: 5
+	},
+	format: wNumb({
+		decimals: 0
+	})
+});
 
-	satSlider.noUiSlider.on('update', function(values, handle){
-		satValueOutput.innerHTML = values[handle];
-	});
+briSlider.noUiSlider.on('update', function(values, handle){
+	briValueOutput.innerHTML = values[handle];
+});
 
-	hueSlider.noUiSlider.on('slide', function(){updateColor();});
-	satSlider.noUiSlider.on('slide', function(){updateColor();});
+//Saturation Slider
+var satSlider = document.getElementById("sat-slider");
+var satValueOutput = document.getElementById("sat-value");
 
-	//X Slider
-	var xSlider = document.getElementById("x-slider");
-	var xSliderValueOutput = document.getElementById("x-slider-value");
+noUiSlider.create(satSlider, {
+	start: 50,
+	step: 1,
+	connect: [true, true],
+	range: {
+		'min' : [0],
+		'50%' : [50],
+		'max' : [100]
+	},
+	pips: {
+		mode: 'range',
+		density: 5
+	},
+	format: wNumb({
+		decimals: 0
+	})
+});
 
-	noUiSlider.create(xSlider, {
-		start: 0.5,
-		connect: [true, true],
-		range: {
-			'min': [0],
-			'max': [1]
-		},
-		pips: {
-			mode: 'range',
-			density: 5
-		},
-		format: wNumb({
-			decimals: 2
-		})
-	});
+satSlider.noUiSlider.on('update', function(values, handle){
+	satValueOutput.innerHTML = values[handle];
+});
 
-	xSlider.noUiSlider.on('update', function(values, handle){
-		xSliderValueOutput.innerHTML = values[handle];
-	});
+hueSlider.noUiSlider.on('slide', function(){updateColor();});
+satSlider.noUiSlider.on('slide', function(){updateColor();});
 
-	//Y Slider
-	var ySlider = document.getElementById("y-slider");
-	var ySliderValueOutput = document.getElementById("y-slider-value");
+//X Slider
+var xSlider = document.getElementById("x-slider");
+var xSliderValueOutput = document.getElementById("x-slider-value");
 
-	noUiSlider.create(ySlider, {
-		start: 0.5,
-		connect: [true, true],
-		range: {
-			'min': [0],
-			'max': [1]
-		},
-		pips: {
-			mode: 'range',
-			density: 5
-		},
-		format: wNumb({
-			decimals: 2
-		})
-	});
+noUiSlider.create(xSlider, {
+	start: 0.5,
+	connect: [true, true],
+	range: {
+		'min': [0],
+		'max': [1]
+	},
+	pips: {
+		mode: 'range',
+		density: 5
+	},
+	format: wNumb({
+		decimals: 2
+	})
+});
 
-	ySlider.noUiSlider.on('update', function(values, handle){
-		ySliderValueOutput.innerHTML = values[handle];
-	});
+xSlider.noUiSlider.on('update', function(values, handle){
+	xSliderValueOutput.innerHTML = values[handle];
+});
 
-	//Brightness Slider For XY
-	var briXYSlider = document.getElementById("bri-slider-xy");
-	var briXYValueOutput = document.getElementById("bri-value-xy");
+//Y Slider
+var ySlider = document.getElementById("y-slider");
+var ySliderValueOutput = document.getElementById("y-slider-value");
 
-	noUiSlider.create(briXYSlider, {
-		start: 50,
-		step: 1,
-		connect: [true, true],
-		range: {
-			'min' : [0],
-			'max' : [255]
-		},
-		pips : {
-			mode: "range",
-			density : 5
-		}
-	});
+noUiSlider.create(ySlider, {
+	start: 0.5,
+	connect: [true, true],
+	range: {
+		'min': [0],
+		'max': [1]
+	},
+	pips: {
+		mode: 'range',
+		density: 5
+	},
+	format: wNumb({
+		decimals: 2
+	})
+});
 
-	briXYSlider.noUiSlider.on('update', function(values, handle){
-		briXYValueOutput.innerHTML = values[handle];
-	});
+ySlider.noUiSlider.on('update', function(values, handle){
+	ySliderValueOutput.innerHTML = values[handle];
+});
 
-	xSlider.noUiSlider.on('slide', function(){updateColor();});
-	ySlider.noUiSlider.on('slide', function(){updateColor();});
-	briXYSlider.noUiSlider.on('slide', function(){updateColor();});
+//Brightness Slider For XY
+var briXYSlider = document.getElementById("bri-slider-xy");
+var briXYValueOutput = document.getElementById("bri-value-xy");
 
-	//Update Slider Colors
-	function updateColor()
-	{
-		if(currentColorType == "hue"){
-			color = "hsl(" + hueSlider.noUiSlider.get() + 
-			", " + satSlider.noUiSlider.get() + 
-			"%, 50%)";
+noUiSlider.create(briXYSlider, {
+	start: 50,
+	step: 1,
+	connect: [true, true],
+	range: {
+		'min' : [0],
+		'max' : [255]
+	},
+	pips : {
+		mode: "range",
+		density : 5
+	}
+});
 
-			var hueStyle = hueSlider.getElementsByClassName("noUi-connect");
-			var satStyle = satSlider.getElementsByClassName("noUi-connect");
+briXYSlider.noUiSlider.on('update', function(values, handle){
+	briXYValueOutput.innerHTML = values[handle];
+});
 
-			for(var i = 0; i < 2; i++)
+xSlider.noUiSlider.on('slide', function(){updateColor();});
+ySlider.noUiSlider.on('slide', function(){updateColor();});
+briXYSlider.noUiSlider.on('slide', function(){updateColor();});
+
+//Update Slider Colors
+function updateColor()
+{
+	if(currentColorType == "hue"){
+		color = "hsl(" + hueSlider.noUiSlider.get() + 
+		", " + satSlider.noUiSlider.get() + 
+		"%, 50%)";
+
+		var hueStyle = hueSlider.getElementsByClassName("noUi-connect");
+		var satStyle = satSlider.getElementsByClassName("noUi-connect");
+
+		for(var i = 0; i < 2; i++)
+		{
+			for(var j = 0; j < 2; j++)
 			{
-				for(var j = 0; j < 2; j++)
-				{
-					switch(i){
-						case 0:
-						hueStyle[j].setAttribute("style", "background:" + color);
-						break;
-						case 1:
-						satStyle[j].setAttribute("style", "background:" + color);
-						break;
-					}
+				switch(i){
+					case 0:
+					hueStyle[j].setAttribute("style", "background:" + color);
+					break;
+					case 1:
+					satStyle[j].setAttribute("style", "background:" + color);
+					break;
 				}
 			}
-
 		}
-		else if(currentColorType == "ct"){
-
-		}
-		else if(currentColorType == "xy"){
-
-
-		}
+	}
+	else if(currentColorType == "ct"){
 
 	}
-	
-});
+	else if(currentColorType == "xy"){
+
+	}
+}
 
 
 
@@ -316,97 +398,38 @@ $(document).ready(function(){
 
 //Hide Element With A Certian ID
 function hideElementWithId(id){
-	console.log("hiding");
+	//Check if variable passed in was a single string
 	if(typeof id === "string"){
+		//Get element data
 		var tmp = document.getElementById(id);
-
+		//Check if element exists
 		if(typeof tmp !== "undefined" && tmp != null){
+			//Add the hide class to hide the element
 			tmp.classList.add("hide");
+			//Return element data
+			return tmp;
 		} 
 		else{
 			return;
 		}
 	}
-	else if(typeof id === "object"){
-		var validIds = [];
-		for(var i = 0; i < id.length; i++){
-			if(typeof id[i] === "string"){
-				validIds.push(id[i]);
-			}
-		}
-
-		if(validIds.length >= 1){
-			for(var i = 0; i < validIds.length; i++){
-				var tmp = document.getElementById(validIds[i]);
-
-				if(tmp !== "undefined" && tmp != null){
-					tmp.classList.add("hide");
-				}
-				else{
-					return;
-				}
-			}
-		}
-	}
 }
 
-//Hide all elements with an id
-function hideAllElementsWithId(id){
-	if(typeof id === "string"){
-		var tmp = document.getElementsById(id);
-		for(var i = 0; i < tmp.length; i++)
-		{
-			if(typeof tmp[i] !== "undefined" && tmp != null){
-				tmp.classList.add("hide");
-			}
-			else {
-				continue;
-			}
-		}
-	}
-	else if(typeof id === Array){
-		var tmp;
-		for(var i = 0; i < id.length; i++){
-			tmp = document.getElementsById(id[i]);
-			for(var j = 0; j < tmp.length; j++){
-				tmp.classList.add("hide");
-			}
-		}
-	}
-}
-
-//Show an element with an id
+//Show Element With A Certian ID
 function showElementWithId(id){
-
+	//Check if variable passed in was a single string
 	if(typeof id === "string"){
+		//Get element data
 		var tmp = document.getElementById(id);
-
+		//Check if element exists
 		if(typeof tmp !== "undefined" && tmp != null){
+			//Remove the hide class to show the element
 			tmp.classList.remove("hide");
+			//Return element data
+			return tmp;
 		} 
 		else{
 			return;
-		}
-	}
-	else if(typeof id === Array){
-		var validIds = [];
-		for(var i = 0; i < id.length; i++){
-			if(typeof id[i] === "string"){
-				validIds.push(id[i]);
-			}
-		}
-
-		if(validIds.length >= 1){
-			for(var i = 0; i < validIds.length; i++){
-				var tmp = document.getElementById(validIds[i]);
-
-				if(tmp !== "undefined" && tmp != null){
-					tmp.classList.remove("hide");
-				}
-				else{
-					return;
-				}
-			}
 		}
 	}
 }
